@@ -1,0 +1,23 @@
+# Environments
+.env
+.env.local
+.venv
+env/
+venv/
+ENV/
+
+# Python caching
+__pycache__/
+*.pyc
+*.pyo
+
+# Data and logs
+*.log
+*.csv
+generated_leads/
+hydrogen_leads/
+wellness_gym_leads/
+
+# Mac / Editors
+.DS_Store
+.vscode/
