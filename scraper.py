@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 from serpapi import GoogleSearch
 from urllib.parse import urlparse
 import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def extract_emails_from_text(text):
     """Extract emails from text using regex"""
@@ -79,6 +81,108 @@ def scrape_email_from_website(url, emit_log=None):
         
     return ""
 
+
+def convert_leads_to_styled_xlsx(leads, output_xlsx_path):
+    """Converts a list of lead dicts into a beautifully styled Excel workbook."""
+    if not leads:
+        return
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Generated Leads"
+    
+    fieldnames = list(leads[0].keys())
+    
+    # ── Style definitions ──
+    header_font = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='1F4E79', end_color='1F4E79', fill_type='solid')
+    header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    
+    cell_font = Font(name='Calibri', size=10)
+    cell_align = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    
+    row_even_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+    
+    # Highlight colors for key columns
+    email_fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')      # Light green
+    website_fill = PatternFill(start_color='D6E8F7', end_color='D6E8F7', fill_type='solid')    # Light blue
+    phone_fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')      # Light gold
+    rating_fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')     # Light orange
+    
+    thin_border = Border(
+        left=Side(style='thin', color='BFBFBF'),
+        right=Side(style='thin', color='BFBFBF'),
+        top=Side(style='thin', color='BFBFBF'),
+        bottom=Side(style='thin', color='BFBFBF')
+    )
+    
+    # ── Write header row ──
+    display_names = {
+        'title': 'Business Name',
+        'address': 'Address',
+        'phone': 'Phone',
+        'website': 'Website',
+        'email': 'Email',
+        'rating': 'Rating',
+        'reviews': 'Reviews',
+        'type': 'Category',
+        'source_query': 'Search Query'
+    }
+    
+    for col_idx, key in enumerate(fieldnames, 1):
+        cell = ws.cell(row=1, column=col_idx, value=display_names.get(key, key.replace('_', ' ').title()))
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    ws.freeze_panes = 'A2'
+    
+    # ── Column index mapping for special coloring ──
+    col_map = {key: idx + 1 for idx, key in enumerate(fieldnames)}
+    
+    # ── Write data rows ──
+    for row_idx, lead in enumerate(leads, 2):
+        is_even = row_idx % 2 == 0
+        for col_idx, key in enumerate(fieldnames, 1):
+            value = lead.get(key, '')
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.font = cell_font
+            cell.alignment = cell_align
+            cell.border = thin_border
+            
+            if is_even:
+                cell.fill = row_even_fill
+            
+            # Special column coloring when cell has data
+            if key == 'email' and value:
+                cell.fill = email_fill
+                cell.font = Font(name='Calibri', size=10, color='375623')
+            elif key == 'website' and value:
+                cell.fill = website_fill
+                cell.font = Font(name='Calibri', size=10, color='1F4E79')
+            elif key == 'phone' and value:
+                cell.fill = phone_fill
+            elif key == 'rating' and value:
+                cell.fill = rating_fill
+                cell.font = Font(name='Calibri', size=10, bold=True, color='C65911')
+    
+    # ── Auto-size columns ──
+    col_widths = {
+        'title': 30, 'address': 35, 'phone': 16, 'website': 30,
+        'email': 30, 'rating': 10, 'reviews': 10, 'type': 20, 'source_query': 25
+    }
+    for col_idx, key in enumerate(fieldnames, 1):
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = col_widths.get(key, 18)
+    
+    # Row heights
+    ws.row_dimensions[1].height = 25
+    for row_idx in range(2, len(leads) + 2):
+        ws.row_dimensions[row_idx].height = 28
+    
+    wb.save(output_xlsx_path)
+
+
 def generate_leads(keyword, location, limit, api_key, require_email=False, require_website=False):
     """
     Fetch leads using SerpAPI Google Maps search.
@@ -92,14 +196,13 @@ def generate_leads(keyword, location, limit, api_key, require_email=False, requi
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_keyword = re.sub(r'[^a-zA-Z0-9]', '_', keyword)
     safe_location = re.sub(r'[^a-zA-Z0-9]', '_', location)
-    filename = f"leads_{safe_keyword}_{safe_location}_{timestamp}.csv"
-    output_path = os.path.join("generated_leads", filename)
+    xlsx_filename = f"leads_{safe_keyword}_{safe_location}_{timestamp}.xlsx"
+    xlsx_output_path = os.path.join("generated_leads", xlsx_filename)
     
     yield {"type": "log", "message": f"Starting lead generation for '{keyword}' in '{location}'. Target: {limit} leads."}
     
     query = f"{keyword} {location}"
     start = 0
-    total_found_approx = 100 # Default to something > 0 to start loop
     
     while len(leads) < limit:
         yield {"type": "log", "message": f"Fetching results from SerpAPI (start={start})..."}
@@ -136,8 +239,6 @@ def generate_leads(keyword, location, limit, api_key, require_email=False, requi
                     
                     email = ""
                     if website:
-                        # Modified scrape_email_from_website to not take a callback to avoid complexity here.
-                        # We'll just print or log inside there, or not log at all, or just yield before/after.
                         yield {"type": "log", "message": f"Scraping emails from {website}..."}
                         email = scrape_email_from_website(website)
                         if email:
@@ -165,14 +266,6 @@ def generate_leads(keyword, location, limit, api_key, require_email=False, requi
                     
                     leads.append(lead)
                     
-                    # Save to CSV incrementally
-                    file_exists = os.path.isfile(output_path)
-                    with open(output_path, 'a', newline='', encoding='utf-8') as output_file:
-                        dict_writer = csv.DictWriter(output_file, fieldnames=lead.keys())
-                        if not file_exists:
-                            dict_writer.writeheader()
-                        dict_writer.writerow(lead)
-                    
                     # Emit progress update
                     yield {
                         "type": "progress",
@@ -187,12 +280,22 @@ def generate_leads(keyword, location, limit, api_key, require_email=False, requi
         except Exception as e:
             yield {"type": "error", "message": f"Google Maps/SerpAPI Error: {str(e)}"}
             return
-            
-    yield {"type": "log", "message": f"Finished. Generated {len(leads)} leads. Saved to {filename}"}
+    
+    # ── Build styled Excel workbook ──
+    if leads:
+        yield {"type": "log", "message": "📊 Building styled Excel report..."}
+        try:
+            convert_leads_to_styled_xlsx(leads, xlsx_output_path)
+        except Exception as e:
+            yield {"type": "error", "message": f"Excel generation error: {str(e)}"}
+            return
+    
+    yield {"type": "log", "message": f"✨ Finished! Generated {len(leads)} leads. Saved to {xlsx_filename}"}
     
     yield {
         "type": "done",
-        "filename": filename,
-        "path": output_path,
+        "filename": xlsx_filename,
+        "path": xlsx_output_path,
         "count": len(leads)
     }
+

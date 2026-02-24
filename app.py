@@ -2,8 +2,11 @@ import os
 import json
 import time
 from flask import Flask, render_template, request, Response, jsonify, send_file
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+import uuid
 from scraper import generate_leads
+from analyzer import analyze_csv_file
 
 # Load environment variables
 load_dotenv('.env.local')
@@ -17,6 +20,10 @@ if not api_key:
     print("WARNING: SERPAPI_KEY not found in environment. Scraping will fail.")
 
 app = Flask(__name__)
+
+UPLOAD_FOLDER = os.path.join(app.root_path, 'generated_leads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
 def index():
@@ -57,6 +64,45 @@ def generate():
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
             
     return Response(generate_events(), mimetype='text/event-stream')
+
+@app.route('/upload_csv', methods=['POST'])
+def upload_csv():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if file and file.filename.endswith('.csv'):
+        filename = secure_filename(f"upload_{uuid.uuid4().hex[:8]}_{file.filename}")
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        return jsonify({"success": True, "filename": filename})
+    return jsonify({"error": "Invalid file type. Please upload a .csv"}), 400
+
+@app.route('/analyze')
+def analyze():
+    filename = request.args.get('filename', '')
+    user_api_key = request.args.get('api_key', '').strip()
+    
+    # Needs a real Gemini key
+    gemini_key = user_api_key if user_api_key else os.getenv("GEMINI_API_KEY")
+    
+    if not filename:
+        return jsonify({"error": "File name is required"}), 400
+        
+    if not gemini_key:
+        return jsonify({"error": "No Gemini API key provided! Please enter one in the UI or set GEMINI_API_KEY in .env.local"}), 400
+        
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    
+    def analyze_events():
+        try:
+            for event in analyze_csv_file(filepath, gemini_key):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            
+    return Response(analyze_events(), mimetype='text/event-stream')
 
 @app.route('/download/<path:filename>')
 def download(filename):

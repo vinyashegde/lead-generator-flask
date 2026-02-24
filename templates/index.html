@@ -17,52 +17,84 @@
             <p class="subtitle">Extract high-quality business leads effortlessly</p>
         </header>
 
-        <form id="leadForm">
-            <div class="row">
-                <div class="input-group">
-                    <label for="keyword">Keyword / Niche</label>
-                    <input type="text" id="keyword" name="keyword" placeholder="e.g. Gym equipment" required>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="tab-extract">1. Extract Leads</button>
+            <button class="tab-btn" data-tab="tab-analyze">2. Analyze Websites</button>
+        </div>
+
+        <!-- TAB 1: EXTRACT LEADS -->
+        <div id="tab-extract" class="tab-content active">
+            <form id="leadForm">
+                <div class="row">
+                    <div class="input-group">
+                        <label for="keyword">Keyword / Niche</label>
+                        <input type="text" id="keyword" name="keyword" placeholder="e.g. Gym equipment" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="apiKey">SerpAPI Key (Optional)</label>
+                        <input type="text" id="apiKey" name="apiKey" placeholder="Leave empty to use default key">
+                    </div>
                 </div>
 
-                <div class="input-group">
-                    <label for="apiKey">SerpAPI Key (Optional)</label>
-                    <input type="text" id="apiKey" name="apiKey" placeholder="Leave empty to use default key">
+                <div class="row">
+                    <div class="input-group">
+                        <label for="location">Location</label>
+                        <input type="text" id="location" name="location" placeholder="e.g. Mumbai" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="limit">Target Limit</label>
+                        <input type="number" id="limit" name="limit" value="10" min="1" max="500" required>
+                    </div>
                 </div>
+
+                <div class="options-group"
+                    style="display: flex; gap: 1rem; margin-bottom: 1.5rem; color: var(--text-secondary);">
+                    <label
+                        style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; font-weight: 400; margin: 0;">
+                        <input type="checkbox" id="requireWebsite"
+                            style="width: 18px; height: 18px; cursor: pointer; padding: 0;">
+                        Must have Website
+                    </label>
+                    <label
+                        style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; font-weight: 400; margin: 0;">
+                        <input type="checkbox" id="requireEmail"
+                            style="width: 18px; height: 18px; cursor: pointer; padding: 0;">
+                        Must have Email
+                    </label>
+                </div>
+
+                <button type="submit" id="generateBtn">
+                    <span class="btn-text" id="btnText">Extract Leads</span>
+                    <span class="btn-loader loader" id="btnLoader"></span>
+                </button>
+            </form>
+        </div>
+
+        <!-- TAB 2: ANALYZE WEBSITES -->
+        <div id="tab-analyze" class="tab-content">
+            <div class="info-box">
+                <p>Upload a generated CSV file to automatically visit every website and use <strong>Gemini 2.5
+                        Flash</strong> to write a custom sales pitch/improvement analysis.</p>
             </div>
-
-            <div class="row">
+            <form id="analyzeForm">
                 <div class="input-group">
-                    <label for="location">Location</label>
-                    <input type="text" id="location" name="location" placeholder="e.g. Mumbai" required>
+                    <label for="csvFile">Upload Leads CSV (.csv)</label>
+                    <input type="file" id="csvFile" name="csvFile" accept=".csv" required
+                        style="padding: 0.7rem; font-family: inherit; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 12px; color: var(--text-primary); width: 100%;">
                 </div>
-
                 <div class="input-group">
-                    <label for="limit">Target Limit</label>
-                    <input type="number" id="limit" name="limit" value="10" min="1" max="500" required>
+                    <label for="geminiKey">Gemini API Key (Optional)</label>
+                    <input type="text" id="geminiKey" name="geminiKey"
+                        placeholder="Leave empty to use server default (.env.local)">
                 </div>
-            </div>
-
-            <div class="options-group"
-                style="display: flex; gap: 1rem; margin-bottom: 1.5rem; color: var(--text-secondary);">
-                <label
-                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; font-weight: 400; margin: 0;">
-                    <input type="checkbox" id="requireWebsite"
-                        style="width: 18px; height: 18px; cursor: pointer; padding: 0;">
-                    Must have Website
-                </label>
-                <label
-                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; font-weight: 400; margin: 0;">
-                    <input type="checkbox" id="requireEmail"
-                        style="width: 18px; height: 18px; cursor: pointer; padding: 0;">
-                    Must have Email
-                </label>
-            </div>
-
-            <button type="submit" id="generateBtn">
-                <span class="btn-text" id="btnText">Extract Leads</span>
-                <span class="btn-loader loader" id="btnLoader"></span>
-            </button>
-        </form>
+                <button type="submit" id="analyzeBtn" class="analyze-btn" style="margin-top: 1rem;">
+                    <span class="btn-text" id="analyzeBtnText">Analyze Websites</span>
+                    <span class="btn-loader loader" id="analyzeBtnLoader"></span>
+                </button>
+            </form>
+        </div>
 
         <div id="progressSection" class="hidden">
             <div class="progress-bar-container">
@@ -101,6 +133,21 @@
     </div>
 
     <script>
+        // Tab Switching Logic
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Extract Leads Logic
         const form = document.getElementById('leadForm');
         const generateBtn = document.getElementById('generateBtn');
         const btnText = document.getElementById('btnText');
@@ -206,8 +253,114 @@
             progressSection.classList.add('hidden');
             downloadSection.classList.add('hidden');
             form.reset();
+            analyzeForm.reset();
             progressBar.classList.remove('finished');
             progressBar.classList.remove('error');
+        });
+
+        // Analyze Websites Logic
+        const analyzeForm = document.getElementById('analyzeForm');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const analyzeBtnText = document.getElementById('analyzeBtnText');
+        const analyzeBtnLoader = document.getElementById('analyzeBtnLoader');
+
+        analyzeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('csvFile');
+            const geminiKey = document.getElementById('geminiKey').value;
+
+            if (!fileInput.files.length) return;
+
+            // UI Update
+            analyzeForm.classList.add('disabled-form');
+            analyzeBtn.classList.add('loading');
+            analyzeBtn.disabled = true;
+            analyzeBtnText.style.display = 'none';
+            analyzeBtnLoader.style.display = 'block';
+
+            progressSection.classList.remove('hidden');
+            downloadSection.classList.add('hidden');
+
+            logWindow.innerHTML = '';
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('finished');
+            progressBar.classList.remove('error');
+            progressText.innerText = `Uploading...`;
+            latestLead.innerText = '';
+
+            // 1. Upload File
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const uploadRes = await fetch('/upload_csv', {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+
+                if (uploadData.error) throw new Error(uploadData.error);
+
+                // 2. Start SSE stream
+                const eventSource = new EventSource(`/analyze?filename=${encodeURIComponent(uploadData.filename)}&api_key=${encodeURIComponent(geminiKey)}`);
+
+                eventSource.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'log') {
+                        const logEl = document.createElement('div');
+                        logEl.className = 'log-entry';
+                        const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        logEl.innerHTML = `<span class="time">[${time}]</span> <span class="msg">${data.message}</span>`;
+                        logWindow.appendChild(logEl);
+                        logWindow.scrollTop = logWindow.scrollHeight;
+                    } else if (data.type === 'progress') {
+                        const percent = Math.min(100, Math.round((data.count / data.total) * 100));
+                        progressBar.style.width = `${percent}%`;
+                        progressText.innerText = `${data.count} / ${data.total} Websites`;
+                        if (data.latest_lead) {
+                            latestLead.innerText = data.latest_lead.length > 30 ? data.latest_lead.substring(0, 30) + '...' : data.latest_lead;
+                        }
+                    } else if (data.type === 'done') {
+                        eventSource.close();
+                        analyzeBtn.classList.remove('loading');
+                        analyzeBtn.disabled = false;
+                        analyzeForm.classList.remove('disabled-form');
+                        analyzeBtnText.style.display = 'block';
+                        analyzeBtnLoader.style.display = 'none';
+
+                        progressBar.style.width = '100%';
+                        progressBar.classList.add('finished');
+
+                        downloadSection.classList.remove('hidden');
+                        downloadLink.href = `/download/${encodeURIComponent(data.filename)}`;
+                    } else if (data.type === 'error') {
+                        throw new Error(data.message);
+                    }
+                };
+
+                eventSource.onerror = function () {
+                    eventSource.close();
+                    throw new Error("Connection to server lost.");
+                };
+
+            } catch (err) {
+                const logEl = document.createElement('div');
+                logEl.className = 'log-entry error';
+                logEl.innerHTML = `<span class="time">[ERROR]</span> <span class="msg">${err.message}</span>`;
+                logWindow.appendChild(logEl);
+                logWindow.scrollTop = logWindow.scrollHeight;
+
+                progressBar.style.width = '100%';
+                progressBar.classList.add('error');
+
+                analyzeBtn.classList.remove('loading');
+                analyzeBtn.disabled = false;
+                analyzeForm.classList.remove('disabled-form');
+                analyzeBtnText.style.display = 'block';
+                analyzeBtnLoader.style.display = 'none';
+            }
         });
     </script>
 </body>
