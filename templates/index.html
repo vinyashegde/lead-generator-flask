@@ -18,8 +18,9 @@
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" data-tab="tab-extract">1. Extract Leads</button>
-            <button class="tab-btn" data-tab="tab-analyze">2. Analyze Websites</button>
+            <button class="tab-btn active" data-tab="tab-extract">1. Business Leads</button>
+            <button class="tab-btn" data-tab="tab-linkedin">2. LinkedIn Leads</button>
+            <button class="tab-btn" data-tab="tab-analyze">3. Analyze Websites</button>
         </div>
 
         <!-- TAB 1: EXTRACT LEADS -->
@@ -72,7 +73,42 @@
             </form>
         </div>
 
-        <!-- TAB 2: ANALYZE WEBSITES -->
+        <!-- TAB 2: LINKEDIN LEADS -->
+        <div id="tab-linkedin" class="tab-content">
+            <div class="info-box" style="border-left-color: #0077b5;">
+                <p>Google X-Ray search targeting <strong>LinkedIn profiles</strong>. Uses SerpAPI to find precise
+                    professional leads without ban risk.</p>
+            </div>
+            <form id="linkedinForm">
+                <div class="row">
+                    <div class="input-group">
+                        <label for="li-keyword">Target Role / Keyword</label>
+                        <input type="text" id="li-keyword" name="li-keyword" placeholder="e.g. CEO, Marketing Director"
+                            required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label for="li-location">Location</label>
+                        <input type="text" id="li-location" name="li-location" placeholder="e.g. New York, USA"
+                            required>
+                    </div>
+
+                    <div class="input-group" style="flex: 0.3;">
+                        <label for="li-limit">Limit</label>
+                        <input type="number" id="li-limit" name="li-limit" value="10" min="1" max="100">
+                    </div>
+                </div>
+
+                <button type="submit" id="linkedinBtn" class="linkedin-btn">
+                    <span class="btn-text" id="linkedinBtnText">Extract LinkedIn Leads</span>
+                    <span class="btn-loader loader" id="linkedinBtnLoader"></span>
+                </button>
+            </form>
+        </div>
+
+        <!-- TAB 3: ANALYZE WEBSITES -->
         <div id="tab-analyze" class="tab-content">
             <div class="info-box">
                 <p>Upload a generated CSV file to automatically visit every website and use <strong>Gemini 2.5
@@ -256,6 +292,99 @@
             analyzeForm.reset();
             progressBar.classList.remove('finished');
             progressBar.classList.remove('error');
+        });
+
+        // LinkedIn Leads Logic
+        const linkedinForm = document.getElementById('linkedinForm');
+        const linkedinBtn = document.getElementById('linkedinBtn');
+        const linkedinBtnText = document.getElementById('linkedinBtnText');
+        const linkedinBtnLoader = document.getElementById('linkedinBtnLoader');
+
+        linkedinForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const keyword = document.getElementById('li-keyword').value;
+            const location = document.getElementById('li-location').value;
+            const limit = document.getElementById('li-limit').value;
+            const userApiKey = document.getElementById('apiKey').value; // Reuse system API key logic
+
+            // UI Update
+            linkedinForm.classList.add('disabled-form');
+            linkedinBtn.classList.add('loading');
+            linkedinBtn.disabled = true;
+            linkedinBtnText.style.display = 'none';
+            linkedinBtnLoader.style.display = 'block';
+
+            progressSection.classList.remove('hidden');
+            downloadSection.classList.add('hidden');
+
+            logWindow.innerHTML = '';
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('finished');
+            progressBar.classList.remove('error');
+            progressText.innerText = `Searching LinkedIn...`;
+            latestLead.innerText = '';
+
+            const eventSource = new EventSource(`/generate_linkedin?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&limit=${limit}&api_key=${encodeURIComponent(userApiKey)}`);
+
+            eventSource.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'log') {
+                    const logEl = document.createElement('div');
+                    logEl.className = 'log-entry';
+                    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    logEl.innerHTML = `<span class="time">[${time}]</span> <span class="msg">${data.message}</span>`;
+                    logWindow.appendChild(logEl);
+                    logWindow.scrollTop = logWindow.scrollHeight;
+                } else if (data.type === 'progress') {
+                    const percent = Math.min(100, Math.round((data.count / data.total) * 100));
+                    progressBar.style.width = `${percent}%`;
+                    progressText.innerText = `${data.count} / ${data.total} Profiles`;
+                    if (data.latest_lead) {
+                        latestLead.innerText = data.latest_lead.length > 30 ? data.latest_lead.substring(0, 30) + '...' : data.latest_lead;
+                    }
+                } else if (data.type === 'done') {
+                    eventSource.close();
+                    linkedinBtn.classList.remove('loading');
+                    linkedinBtn.disabled = false;
+                    linkedinForm.classList.remove('disabled-form');
+                    linkedinBtnText.style.display = 'block';
+                    linkedinBtnLoader.style.display = 'none';
+
+                    progressBar.style.width = '100%';
+                    progressBar.classList.add('finished');
+
+                    downloadSection.classList.remove('hidden');
+                    downloadLink.href = `/download/${encodeURIComponent(data.filename)}`;
+                    downloadLink.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download LinkedIn XLSX`;
+                } else if (data.type === 'error') {
+                    eventSource.close();
+                    handleError(data.message);
+                }
+            };
+
+            eventSource.onerror = function () {
+                eventSource.close();
+                handleError("Connection to server lost.");
+            };
+
+            function handleError(msg) {
+                const logEl = document.createElement('div');
+                logEl.className = 'log-entry error';
+                logEl.innerHTML = `<span class="time">[ERROR]</span> <span class="msg">${msg}</span>`;
+                logWindow.appendChild(logEl);
+                logWindow.scrollTop = logWindow.scrollHeight;
+
+                progressBar.style.width = '100%';
+                progressBar.classList.add('error');
+
+                linkedinBtn.classList.remove('loading');
+                linkedinBtn.disabled = false;
+                linkedinForm.classList.remove('disabled-form');
+                linkedinBtnText.style.display = 'block';
+                linkedinBtnLoader.style.display = 'none';
+            }
         });
 
         // Analyze Websites Logic

@@ -186,6 +186,23 @@ button {
     transform: translateY(1px);
 }
 
+.linkedin-btn {
+    background: #0077b5;
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 119, 181, 0.4);
+    margin-top: 1rem;
+    height: 56px;
+}
+
+.linkedin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 119, 181, 0.6);
+}
+
+.linkedin-btn:active {
+    transform: translateY(1px);
+}
+
 .btn-loader {
     display: none;
     width: 24px;
