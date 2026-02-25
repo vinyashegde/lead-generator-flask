@@ -19,8 +19,9 @@
 
         <div class="tabs">
             <button class="tab-btn active" data-tab="tab-extract">1. Business Leads</button>
-            <button class="tab-btn" data-tab="tab-linkedin">2. LinkedIn Leads</button>
-            <button class="tab-btn" data-tab="tab-analyze">3. Analyze Websites</button>
+            <button class="tab-btn" data-tab="tab-linkedin">2. AI Smart Campaign</button>
+            <button class="tab-btn b2b-tab-btn" data-tab="tab-b2b">3. B2B Partners</button>
+            <button class="tab-btn" data-tab="tab-analyze">4. Analyze Websites</button>
         </div>
 
         <!-- TAB 1: EXTRACT LEADS -->
@@ -111,7 +112,44 @@
             </form>
         </div>
 
-        <!-- TAB 3: ANALYZE WEBSITES -->
+        <!-- TAB 3: B2B PARTNERS -->
+        <div id="tab-b2b" class="tab-content">
+            <div class="info-box" style="border-left-color: #1E3A2F; background: rgba(30, 58, 47, 0.2);">
+                <p><strong>B2B Vendor Locator:</strong> Finds physical businesses on Google Maps, scrapes their websites
+                    for <strong>Official Emails</strong>, and uses LinkedIn X-Ray to find the <strong>Store
+                        Owner/Buyer</strong>.</p>
+            </div>
+            <form id="b2bForm">
+                <div class="row">
+                    <div class="input-group">
+                        <label for="b2b-keyword">Type of Business (Vendor/Distributor)</label>
+                        <input type="text" id="b2b-keyword" name="b2b-keyword"
+                            placeholder="e.g. Holistic Health Store, Biohacking Clinic" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label for="b2b-location">Location</label>
+                        <input type="text" id="b2b-location" name="b2b-location" placeholder="e.g. Miami, Florida"
+                            required>
+                    </div>
+
+                    <div class="input-group" style="flex: 0.3;">
+                        <label for="b2b-limit">Limit</label>
+                        <input type="number" id="b2b-limit" name="b2b-limit" value="10" min="1" max="100">
+                    </div>
+                </div>
+
+                <button type="submit" id="b2bBtn" class="b2b-btn"
+                    style="background: linear-gradient(135deg, #1E3A2F 0%, #2A5A44 100%);">
+                    <span class="btn-text" id="b2bBtnText">Find B2B Partners</span>
+                    <span class="btn-loader loader" id="b2bBtnLoader"></span>
+                </button>
+            </form>
+        </div>
+
+        <!-- TAB 4: ANALYZE WEBSITES -->
         <div id="tab-analyze" class="tab-content">
             <div class="info-box">
                 <p>Upload a generated CSV file to automatically visit every website and use <strong>Gemini 2.5
@@ -389,6 +427,100 @@
                 linkedinBtnLoader.style.display = 'none';
             }
         });
+
+        // B2B Partners Logic
+        const b2bForm = document.getElementById('b2bForm');
+        const b2bBtn = document.getElementById('b2bBtn');
+        const b2bBtnText = document.getElementById('b2bBtnText');
+        const b2bBtnLoader = document.getElementById('b2bBtnLoader');
+
+        b2bForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const keyword = document.getElementById('b2b-keyword').value;
+            const location = document.getElementById('b2b-location').value;
+            const limit = document.getElementById('b2b-limit').value;
+            const userApiKey = document.getElementById('apiKey').value;
+
+            // UI Update
+            b2bForm.classList.add('disabled-form');
+            b2bBtn.classList.add('loading');
+            b2bBtn.disabled = true;
+            b2bBtnText.style.display = 'none';
+            b2bBtnLoader.style.display = 'block';
+
+            progressSection.classList.remove('hidden');
+            downloadSection.classList.add('hidden');
+
+            logWindow.innerHTML = '';
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('finished');
+            progressBar.classList.remove('error');
+            progressText.innerText = `Searching Maps & Websites...`;
+            latestLead.innerText = '';
+
+            const eventSource = new EventSource(`/generate_b2b?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&limit=${limit}&api_key=${encodeURIComponent(userApiKey)}`);
+
+            eventSource.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'log') {
+                    const logEl = document.createElement('div');
+                    logEl.className = 'log-entry';
+                    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    logEl.innerHTML = `<span class="time">[${time}]</span> <span class="msg">${data.message}</span>`;
+                    logWindow.appendChild(logEl);
+                    logWindow.scrollTop = logWindow.scrollHeight;
+                } else if (data.type === 'progress') {
+                    const percent = Math.min(100, Math.round((data.count / data.total) * 100));
+                    progressBar.style.width = `${percent}%`;
+                    progressText.innerText = `${data.count} / ${data.total} Partners`;
+                    if (data.latest_lead) {
+                        latestLead.innerText = data.latest_lead.length > 30 ? data.latest_lead.substring(0, 30) + '...' : data.latest_lead;
+                    }
+                } else if (data.type === 'done') {
+                    eventSource.close();
+                    b2bBtn.classList.remove('loading');
+                    b2bBtn.disabled = false;
+                    b2bForm.classList.remove('disabled-form');
+                    b2bBtnText.style.display = 'block';
+                    b2bBtnLoader.style.display = 'none';
+
+                    progressBar.style.width = '100%';
+                    progressBar.classList.add('finished');
+
+                    downloadSection.classList.remove('hidden');
+                    downloadLink.href = `/download/${encodeURIComponent(data.filename)}`;
+                    downloadLink.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download B2B Partners XLSX`;
+                } else if (data.type === 'error') {
+                    eventSource.close();
+                    handleError(data.message);
+                }
+            };
+
+            eventSource.onerror = function () {
+                eventSource.close();
+                handleError("Connection to server lost.");
+            };
+
+            function handleError(msg) {
+                const logEl = document.createElement('div');
+                logEl.className = 'log-entry error';
+                logEl.innerHTML = `<span class="time">[ERROR]</span> <span class="msg">${msg}</span>`;
+                logWindow.appendChild(logEl);
+                logWindow.scrollTop = logWindow.scrollHeight;
+
+                progressBar.style.width = '100%';
+                progressBar.classList.add('error');
+
+                b2bBtn.classList.remove('loading');
+                b2bBtn.disabled = false;
+                b2bForm.classList.remove('disabled-form');
+                b2bBtnText.style.display = 'block';
+                b2bBtnLoader.style.display = 'none';
+            }
+        });
+
 
         // Analyze Websites Logic
         const analyzeForm = document.getElementById('analyzeForm');

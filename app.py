@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import uuid
 from scraper import generate_leads
 from scraper_linkedin import generate_linkedin_leads
+from scraper_b2b import generate_b2b_partners
 from analyzer import analyze_csv_file
 
 # Load environment variables
@@ -91,6 +92,33 @@ def generate_linkedin():
     def generate_events():
         try:
             for event in generate_linkedin_leads(goal, location, limit, final_api_key, gemini_key):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            
+    return Response(generate_events(), mimetype='text/event-stream')
+
+@app.route('/generate_b2b')
+def generate_b2b():
+    keyword = request.args.get('keyword', '')
+    location = request.args.get('location', '')
+    try:
+        limit = int(request.args.get('limit', 10))
+    except ValueError:
+        limit = 10
+    
+    user_api_key = request.args.get('api_key', '').strip()
+    final_api_key = user_api_key if user_api_key else api_key
+    
+    if not keyword or not location:
+        return jsonify({"error": "Business Keyword and location are required"}), 400
+        
+    if not final_api_key:
+        return jsonify({"error": "No SerpAPI key provided! Please enter it in the UI or set SERPAPI_KEY in .env.local"}), 400
+
+    def generate_events():
+        try:
+            for event in generate_b2b_partners(keyword, location, limit, final_api_key):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
