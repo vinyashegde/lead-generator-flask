@@ -204,7 +204,7 @@ def generate_b2b_partners(keyword, location, limit, api_key):
         local_results = results.get("local_results", [])
         
         if not local_results:
-            yield {"type": "log", "message": "No businesses found matching your criteria on Google Maps."}
+            yield {"type": "error", "message": "No businesses found on Google Maps. Try broader terms like 'Wellness Center', 'Health Food Store', or 'Water Purification'."}
             return
             
         for result in local_results:
