@@ -76,15 +76,18 @@
         <!-- TAB 2: LINKEDIN LEADS -->
         <div id="tab-linkedin" class="tab-content">
             <div class="info-box" style="border-left-color: #0077b5;">
-                <p>Google X-Ray search targeting <strong>LinkedIn profiles</strong>. Uses SerpAPI to find precise
-                    professional leads without ban risk.</p>
+                <p><strong>AI Smart Campaign:</strong> Describe your target audience in plain English. Gemini 2.5 Flash
+                    will automatically generate the most precise query permutations to find your ideal vendors/leads.
+                </p>
             </div>
             <form id="linkedinForm">
                 <div class="row">
                     <div class="input-group">
-                        <label for="li-keyword">Target Role / Keyword</label>
-                        <input type="text" id="li-keyword" name="li-keyword" placeholder="e.g. CEO, Marketing Director"
-                            required>
+                        <label for="li-goal">Describe your business goal & target audience</label>
+                        <textarea id="li-goal" name="li-goal" rows="3"
+                            placeholder="e.g. We sell hydrogen water machines and want to find vendors, holistic health shop owners, and wellness clinics who would want to sell our products."
+                            required
+                            style="padding: 0.7rem; font-family: inherit; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 12px; color: var(--text-primary); width: 100%; resize: vertical;"></textarea>
                     </div>
                 </div>
 
@@ -303,7 +306,7 @@
         linkedinForm.addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const keyword = document.getElementById('li-keyword').value;
+            const goal = document.getElementById('li-goal').value;
             const location = document.getElementById('li-location').value;
             const limit = document.getElementById('li-limit').value;
             const userApiKey = document.getElementById('apiKey').value; // Reuse system API key logic
@@ -322,10 +325,10 @@
             progressBar.style.width = '0%';
             progressBar.classList.remove('finished');
             progressBar.classList.remove('error');
-            progressText.innerText = `Searching LinkedIn...`;
+            progressText.innerText = `Analyzing Goal with Gemini AI...`;
             latestLead.innerText = '';
 
-            const eventSource = new EventSource(`/generate_linkedin?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&limit=${limit}&api_key=${encodeURIComponent(userApiKey)}`);
+            const eventSource = new EventSource(`/generate_linkedin?goal=${encodeURIComponent(goal)}&location=${encodeURIComponent(location)}&limit=${limit}&api_key=${encodeURIComponent(userApiKey)}`);
 
             eventSource.onmessage = function (event) {
                 const data = JSON.parse(event.data);

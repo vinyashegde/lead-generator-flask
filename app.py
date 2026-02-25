@@ -68,7 +68,7 @@ def generate():
 
 @app.route('/generate_linkedin')
 def generate_linkedin():
-    keyword = request.args.get('keyword', '')
+    goal = request.args.get('goal', '')
     location = request.args.get('location', '')
     try:
         limit = int(request.args.get('limit', 10))
@@ -77,16 +77,20 @@ def generate_linkedin():
     
     user_api_key = request.args.get('api_key', '').strip()
     final_api_key = user_api_key if user_api_key else api_key
+    gemini_key = user_api_key if user_api_key else os.getenv("GEMINI_API_KEY")
     
-    if not keyword or not location:
-        return jsonify({"error": "Keyword and location are required"}), 400
+    if not goal or not location:
+        return jsonify({"error": "Business goal and location are required"}), 400
         
     if not final_api_key:
-        return jsonify({"error": "No SerpAPI key provided! Please enter one in the UI or set it in .env.local"}), 400
+        return jsonify({"error": "No SerpAPI key provided! Please enter it in the UI or set SERPAPI_KEY in .env.local"}), 400
+        
+    if not gemini_key:
+        return jsonify({"error": "No Gemini API key provided! Please enter it in the UI or set GEMINI_API_KEY in .env.local"}), 400
 
     def generate_events():
         try:
-            for event in generate_linkedin_leads(keyword, location, limit, final_api_key):
+            for event in generate_linkedin_leads(goal, location, limit, final_api_key, gemini_key):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
